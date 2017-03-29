@@ -16,6 +16,9 @@ import Response from './response';
 import Headers from './headers';
 import Request, { getNodeRequestOptions } from './request';
 import FetchError from './fetch-error';
+import AbortError from './abort-error';
+import FetchController from './fetch-controller';
+import FetchSignal from './fetch-signal';
 
 /**
  * Fetch function
@@ -33,6 +36,15 @@ export default function fetch(url, opts) {
 
 	Body.Promise = fetch.Promise;
 
+	if (opts && opts.signal !== undefined) {
+			if (!(opts.signal instanceof FetchSignal)) {
+				throw new TypeError('signal was not a FetchSignal from a FetchController')
+			}
+			if (opts.signal.aborted) {
+				return fetch.Promise.reject(new AbortError('Fetch was aborted'))
+			}
+		}
+
 	// wrap http.request into fetch
 	return new fetch.Promise((resolve, reject) => {
 		// build request object
@@ -48,7 +60,7 @@ export default function fetch(url, opts) {
 
 		// send request
 		const req = send(options);
-		let reqTimeout;
+		let reqTimeout, body;
 
 		if (request.timeout) {
 			req.once('socket', socket => {
@@ -57,6 +69,18 @@ export default function fetch(url, opts) {
 					reject(new FetchError(`network timeout at: ${request.url}`, 'request-timeout'));
 				}, request.timeout);
 			});
+		}
+
+		if (opts && opts.signal !== undefined) {
+			opts.signal.on('abort', () => {
+				if (opts.signal.aborted && !req.aborted) {
+					if (body) {
+						body.emit('error', new AbortError('Fetch was aborted'))
+					}
+					req.abort()
+					reject(new AbortError('Fetch was aborted'))
+				}
+			})
 		}
 
 		req.on('error', err => {
@@ -115,7 +139,7 @@ export default function fetch(url, opts) {
 			}
 
 			// prepare response
-			let body = res.pipe(new PassThrough());
+			body = res.pipe(new PassThrough());
 			const response_options = {
 				url: request.url
 				, status: res.statusCode
@@ -197,5 +221,8 @@ export {
 	Headers,
 	Request,
 	Response,
-	FetchError
+	FetchError,
+	AbortError,
+	FetchController,
+	FetchSignal
 };
