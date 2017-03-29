@@ -26,7 +26,9 @@ import fetch, {
 	FetchError,
 	Headers,
 	Request,
-	Response
+	Response,
+	AbortError,
+	FetchController
 } from '../src/';
 import FetchErrorOrig from '../src/fetch-error.js';
 import HeadersOrig from '../src/headers.js';
@@ -1839,6 +1841,50 @@ describe('node-fetch', () => {
 		});
 	});
 
+	it('should allow aborting', function() {
+		this.timeout(500);
+		const controller = new FetchController();
+		const signal = controller.signal;
+		setTimeout(() => { controller.abort(); }, 100);
+		url = `${base}timeout`;
+		opts = {
+			signal
+		};
+		return expect(fetch(url, opts)).to.eventually.be.rejectedWith(AbortError)
+			.then(() => {
+				expect(signal.aborted).to.be.true;
+			});
+	});
+
+	it('should allow aborting during response', function() {
+		this.timeout(500);
+		const controller = new FetchController();
+		const signal = controller.signal;
+		setTimeout(() => { controller.abort(); }, 100);
+		url = `${base}slow`;
+		opts = {
+			signal
+		};
+		return fetch(url, opts).then(res => {
+			expect(res.ok).to.be.true;
+			return expect(res.text()).to.eventually.be.rejectedWith(AbortError)
+				.then(() => {
+					expect(signal.aborted).to.be.true;
+				});
+		});
+	});
+
+	it('can be aborted before it is sent', function() {
+		const controller = new FetchController();
+		const signal = controller.signal;
+		controller.abort();
+		url = 'http://example.com/';
+		opts = {
+			signal
+		};
+		expect(signal.aborted).to.be.true;
+		return expect(fetch(url, opts)).to.eventually.be.rejectedWith(AbortError);
+	});
 });
 
 function streamToPromise(stream, dataHandler) {
