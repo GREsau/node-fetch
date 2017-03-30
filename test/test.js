@@ -1845,7 +1845,7 @@ describe('node-fetch', () => {
 		this.timeout(500);
 		const controller = new FetchController();
 		const signal = controller.signal;
-		setTimeout(() => { controller.abort(); }, 100);
+		setTimeout(() => { controller.abort(); controller.abort(); }, 100);
 		url = `${base}timeout`;
 		opts = {
 			signal
@@ -1884,6 +1884,30 @@ describe('node-fetch', () => {
 		};
 		expect(signal.aborted).to.be.true;
 		return expect(fetch(url, opts)).to.eventually.be.rejectedWith(AbortError);
+	});
+
+	it('should ignore manually emitted abort events', function() {
+		const controller = new FetchController();
+		const signal = controller.signal;
+		setTimeout(() => { signal.emit('abort'); }, 50);
+		url = `${base}size/chunk`;
+		opts = {
+			signal
+		};
+		return fetch(url, opts).then(res => {
+			return res.text();
+		}).then(text => {
+			expect(text).to.be.equal('testtest')
+			expect(signal.aborted).to.be.false;
+		});
+	});
+
+	it('reuires a signal to be a FetchSignal', function() {
+		url = 'http://example.com/';
+		opts = {
+			signal: {}
+		};
+		return expect(() => fetch(url, opts)).to.throw(TypeError)
 	});
 });
 
