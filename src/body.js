@@ -9,6 +9,7 @@ import {convert} from 'encoding';
 import Stream, {PassThrough} from 'stream';
 import Blob, {BUFFER} from './blob.js';
 import FetchError from './fetch-error.js';
+import AbortError from './abort-error';
 
 const DISTURBED = Symbol('disturbed');
 
@@ -185,6 +186,10 @@ function consumeBody(body) {
 
 		// handle stream error, such as incorrect content-encoding
 		this.body.on('error', err => {
+			if (err instanceof AbortError) {
+				abort = true
+				reject(err)
+			}
 			reject(new FetchError(`Invalid response body while trying to fetch ${this.url}: ${err.message}`, 'system', err));
 		});
 
