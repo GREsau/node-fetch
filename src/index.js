@@ -14,7 +14,7 @@ import {PassThrough} from 'stream';
 import Body, { writeToStream } from './body';
 import Response from './response';
 import Headers from './headers';
-import Request, { getNodeRequestOptions } from './request';
+import Request, { getNodeRequestOptions, SIGNAL } from './request';
 import FetchError from './fetch-error';
 import AbortError from './abort-error';
 import FetchController from './fetch-controller';
@@ -36,19 +36,16 @@ export default function fetch(url, opts) {
 
 	Body.Promise = fetch.Promise;
 
-	if (opts && opts.signal !== undefined) {
-			if (!(opts.signal instanceof FetchSignal)) {
-				throw new TypeError('signal was not a FetchSignal from a FetchController')
-			}
-			if (opts.signal.aborted) {
-				return fetch.Promise.reject(new AbortError('Fetch was aborted'))
-			}
-		}
-
 	// wrap http.request into fetch
 	return new fetch.Promise((resolve, reject) => {
 		// build request object
 		const request = new Request(url, opts);
+		
+		if (request[SIGNAL] && request[SIGNAL].aborted) {
+			reject(new AbortError('Fetch was aborted'))
+			return
+		}
+
 		const options = getNodeRequestOptions(request);
 
 		const send = (options.protocol === 'https:' ? https : http).request;
@@ -71,9 +68,9 @@ export default function fetch(url, opts) {
 			});
 		}
 
-		if (opts && opts.signal !== undefined) {
-			opts.signal.on('abort', () => {
-				if (opts.signal.aborted && !req.aborted) {
+		if (request[SIGNAL] !== undefined) {
+			request[SIGNAL].on('abort', () => {
+				if (request[SIGNAL].aborted && !req.aborted) {
 					if (body) {
 						body.emit('error', new AbortError('Fetch was aborted'))
 					}
@@ -111,7 +108,7 @@ export default function fetch(url, opts) {
 				// per fetch spec, for POST request with 301/302 response, or any request with 303 response, use GET when following redirect
 				if (res.statusCode === 303
 					|| ((res.statusCode === 301 || res.statusCode === 302) && request.method === 'POST'))
-				{
+				{					
 					request.method = 'GET';
 					request.body = null;
 					request.headers.delete('content-length');

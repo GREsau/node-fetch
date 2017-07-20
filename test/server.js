@@ -245,6 +245,12 @@ export default class TestServer {
 			res.end();
 		}
 
+		if (p === '/redirect/301/timeout') {
+			res.statusCode = 301;
+			res.setHeader('Location', '/timeout');
+			res.end();
+		}
+
 		if (p === '/error/redirect') {
 			res.statusCode = 301;
 			//res.setHeader('Location', '/inspect');

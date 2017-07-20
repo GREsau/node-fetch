@@ -1874,6 +1874,21 @@ describe('node-fetch', () => {
 		});
 	});
 
+	it('should allow aborting a redirected request', function() {
+		this.timeout(500);
+		const controller = new FetchController();
+		const signal = controller.signal;
+		setTimeout(() => { controller.abort(); }, 100);
+		url = `${base}redirect/301/timeout`;
+		opts = {
+			signal
+		};
+		return expect(fetch(url, opts)).to.eventually.be.rejectedWith(AbortError)
+			.then(() => {
+				expect(signal.aborted).to.be.true;
+			});
+	});
+
 	it('can be aborted before it is sent', function() {
 		const controller = new FetchController();
 		const signal = controller.signal;
@@ -1902,12 +1917,12 @@ describe('node-fetch', () => {
 		});
 	});
 
-	it('reuires a signal to be a FetchSignal', function() {
+	it('requires a signal to be a FetchSignal', function() {
 		url = 'http://example.com/';
 		opts = {
 			signal: {}
 		};
-		return expect(() => fetch(url, opts)).to.throw(TypeError)
+		return expect(fetch(url, opts)).to.eventually.be.rejectedWith(TypeError)
 	});
 });
 

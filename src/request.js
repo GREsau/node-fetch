@@ -8,8 +8,10 @@
 import { format as format_url, parse as parse_url } from 'url';
 import Headers from './headers.js';
 import Body, { clone, extractContentType, getTotalBytes } from './body';
+import FetchSignal from './fetch-signal';
 
 const PARSED_URL = Symbol('url');
+export const SIGNAL = Symbol('signal');
 
 /**
  * Request class
@@ -20,6 +22,13 @@ const PARSED_URL = Symbol('url');
  */
 export default class Request {
 	constructor(input, init = {}) {
+		if (init.signal !== undefined) {
+			if (!(init.signal instanceof FetchSignal)) {
+				throw new TypeError('signal was not a FetchSignal from a FetchController');
+			}
+		}
+		this[SIGNAL] = init.signal || init[SIGNAL] || input[SIGNAL];
+
 		let parsedURL;
 
 		// normalize input
